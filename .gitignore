@@ -1,0 +1,24 @@
+# Virtual environment
+.venv/
+
+# Downloaded data — papers, vector store, logs
+data/
+
+# Personal / dev logs and notes
+usermadelog.txt
+user_feedbacks.txt
+
+# Claude Code internal file (dev notes, not part of the project)
+CLAUDE.md
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# S2 API key (never commit secrets)
+data/s2_api_key.txt
+
+# OS
+.DS_Store
+Thumbs.db

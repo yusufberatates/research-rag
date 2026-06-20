@@ -121,3 +121,10 @@ QDRANT_COLLECTION = "research_rag_papers"
 # --- OCR -----------------------------------------------------------------
 OCR_MIN_CHARS_PER_PAGE = 20  # below this, a page is considered "scanned"
 OCR_DPI = 300
+
+# --- Index chunking strategy ---------------------------------------------
+# "chunk"          — SentenceSplitter(800 tokens, 100 overlap). Default; fast to build.
+# "sentence_window" — SentenceWindowNodeParser(window±3). Better retrieval quality
+#                    but ~10x more nodes, so a full re-index takes significantly
+#                    longer on CPU. Change, then run: reset_index + index <topic>.
+INDEX_MODE = os.environ.get("INDEX_MODE", "chunk")

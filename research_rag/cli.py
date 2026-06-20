@@ -7,6 +7,7 @@ Subcommands:
   index    <topic>
   pipeline <topic> [--query Q] [--max-results N]   (download+extract+classify+index)
   query    "<question>"
+  chat                              interactive multi-turn query session
   taxonomy                          show the current field tree
   consolidate_taxonomy              merge semantically similar sibling nodes
   reset_taxonomy                    overwrite taxonomy with the seeded 7 fields
@@ -147,8 +148,7 @@ def cmd_pipeline(args: argparse.Namespace) -> None:
     cmd_index(args)
 
 
-def cmd_query(args: argparse.Namespace) -> None:
-    result = answer_question(args.question)
+def _print_result(result: dict) -> None:
     print("\n=== Answer ===")
     print(result["answer"])
     print(f"\n(routing: {result['routing']})")
@@ -159,7 +159,40 @@ def cmd_query(args: argparse.Namespace) -> None:
         path = " / ".join(
             x for x in (c.get("field"), c.get("subfield"), c.get("subsubfield")) if x
         )
-        print(f"  - {c['title']} — {c['authors']} ({c['year']})  [{path}]")
+        url_part = f"\n      {c['url']}" if c.get("url") else ""
+        print(f"  - {c['title']} — {c['authors']} ({c['year']})  [{path}]{url_part}")
+
+
+def cmd_query(args: argparse.Namespace) -> None:
+    _print_result(answer_question(args.question))
+
+
+def cmd_chat(args: argparse.Namespace) -> None:
+    """Interactive multi-turn query session. Follow-up questions are condensed
+    against prior turns so pronoun references and context carry across turns."""
+    print("Research RAG — chat mode  (type 'exit' or press Ctrl+C to quit)")
+    print("Each follow-up question is automatically resolved against prior context.\n")
+    history: list[tuple[str, str]] = []
+    while True:
+        try:
+            question = input("Q: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nExiting chat.")
+            break
+        if not question:
+            continue
+        if question.lower() in {"exit", "quit", "q"}:
+            break
+        result = answer_question(question, history=history if history else None)
+        print(f"\nA: {result['answer']}")
+        print(f"   (routing: {result['routing']})")
+        if result["citations"]:
+            print("   Sources:")
+            for c in result["citations"]:
+                url_part = f"  <{c['url']}>" if c.get("url") else ""
+                print(f"     - {c['title']} ({c['year']}){url_part}")
+        print()
+        history.append((question, result["answer"]))
 
 
 def cmd_taxonomy(args: argparse.Namespace) -> None:
@@ -392,6 +425,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_query = sub.add_parser("query", help="Ask a question over the indexed corpus")
     p_query.add_argument("question")
     p_query.set_defaults(func=cmd_query)
+
+    p_chat = sub.add_parser(
+        "chat", help="Interactive multi-turn query session with conversation history"
+    )
+    p_chat.set_defaults(func=cmd_chat)
 
     p_tax = sub.add_parser("taxonomy", help="Print the current field tree")
     p_tax.set_defaults(func=cmd_taxonomy)

@@ -10,13 +10,22 @@ giving field -> subfield -> chunk routing.
 from __future__ import annotations
 
 from llama_index.core import Document, Settings, StorageContext, VectorStoreIndex
-from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.node_parser import SentenceSplitter, SentenceWindowNodeParser
+
+from research_rag.config import INDEX_MODE
 
 from .embeddings import get_embedding_model
 from .vector_store import get_vector_store
 
 Settings.embed_model = get_embedding_model()
-Settings.node_parser = SentenceSplitter(chunk_size=800, chunk_overlap=100)
+
+if INDEX_MODE == "sentence_window":
+    # Each node = one sentence; retrieval swaps it for a ±3-sentence window via
+    # MetadataReplacementPostProcessor in the query engine. Better retrieval
+    # quality but ~10x more nodes — requires reset_index + re-index after switching.
+    Settings.node_parser = SentenceWindowNodeParser(window_size=3)
+else:
+    Settings.node_parser = SentenceSplitter(chunk_size=800, chunk_overlap=100)
 
 _index: VectorStoreIndex | None = None
 
@@ -77,3 +86,10 @@ def add_paper_to_index(
         doc_id=paper_id,
     )
     index.insert(document)
+
+    # Invalidate BM25 cache so the next query sees this paper.
+    try:
+        from research_rag.query.bm25_index import reset_bm25
+        reset_bm25()
+    except Exception:
+        pass
